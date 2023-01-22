@@ -5,16 +5,13 @@ from django.db import transaction
 class UserController:
 
     def register_user_inventory(self, inventory, id):
-        print(id)
         qset = InventoryDetails.objects.all()
-        print(qset)
         for key, value in inventory.items():
 
             if key.lower() not in constants.InventoryConstant.INVENTORY_LIST:
                 continue
 
             inventory_id = qset.filter(name = key).first().id
-            print(key, inventory_id)
             inventory_obj = {
                 "user_id" : id,
                 "inventory_id" : inventory_id,
@@ -25,9 +22,9 @@ class UserController:
 
     def update_user_location(self, update_user_id, request_user_id, location):
         
-        if(update_user_id != request_user_id):
+        if update_user_id != request_user_id:
             is_admin = User.objects.get(id = request_user_id).is_admin
-            if(not is_admin):
+            if not is_admin:
                 return constants.UserConstant.UserLocationConstants.PERMISSION_ERROR
         
         User.objects.filter(id=update_user_id).update(**location)
@@ -41,7 +38,7 @@ class UserController:
         if user.infected_3:
             return constants.UserConstant.UserMarkingConstants.ALREADY_SUCCESSFULLY_MARKED
 
-        if(mark_user_id == reporter_user_id):
+        if mark_user_id == reporter_user_id:
             user.infected_3 = reporter_user_id
             user.save(update_fields=['infected_3'])
             return constants.UserConstant.UserMarkingConstants.AWESOME_PERSON
@@ -85,7 +82,6 @@ class UserController:
                 return constants.UserConstant.UserTradingConstants.INFECTED
 
             if obj.id == buyer_id:
-                print(obj.id)
                 buyer_points, buyer_map, buyer_inventory_ids, err = self.calculate_points(obj.id, offered_goods)
 
                 if err:
@@ -122,7 +118,6 @@ class UserController:
         user_inventory_ids = []
 
         for obj in results:
-            print(obj.name, obj.points, obj.qty)
 
             inventory_details[obj.name] = [obj.qty, obj.points]
             inventory_user_map[obj.name] = obj.id
@@ -130,7 +125,7 @@ class UserController:
 
         for key, value in goods.items():
             inventory = inventory_details.get(key)
-            print(key, inventory)
+            
             if inventory and inventory[0]>=value:
                 total_points += (value*inventory[1])
             else:

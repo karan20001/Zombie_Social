@@ -23,7 +23,7 @@ def authentication(function):
                 key = str(user.id) + UserConstant.REDIS_USER_KEY
 
                 if redis.get_keys(key):
-                    return function(self, request)
+                    return function(self, request, *args, **kwargs)
                 else:
                     response.data = {
                         "message": "Unauthorized",
