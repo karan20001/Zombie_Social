@@ -1,5 +1,6 @@
 from user.models import InventoryDetails, UserInventory, User
 from user.libs.constants import constants
+from django.db import transaction
 
 class UserController:
 
@@ -73,24 +74,31 @@ class UserController:
             return constants.UserConstant.UserMarkingConstants.SUCCESSFULLY_MARKED    
 
 
-    def trade_inventory(self, buyer_id, seller_id, requested_goods, offered_goods):
+    @transaction.atomic
+    def trade_inventory(self, seller_id, buyer_id, requested_goods, offered_goods):
 
-        user_qset = User.objects.filter(id__in = [buyer_id, seller_id]).only(id)
+        user_qset = User.objects.filter(id__in = [buyer_id, seller_id]).only("id","infected_3")
 
         for obj in user_qset:
+
+            if obj.infected_3:
+                return constants.UserConstant.UserTradingConstants.INFECTED
+
             if obj.id == buyer_id:
-                err = self.verify(obj.id, offered_goods)
+                print(obj.id)
+                buyer_points, buyer_map, buyer_inventory_ids, err = self.calculate_points(obj.id, offered_goods)
 
                 if err:
                     return constants.UserConstant.UserTradingConstants.OFFERED + err
                 
             else:
-                err = self.verify(obj.id, requested_goods)
+                seller_points, seller_map, seller_inventory_ids, err = self.calculate_points(obj.id, requested_goods)
 
                 if err:
                     return constants.UserConstant.UserTradingConstants.REQUESTED + err
                 
-        if self.execute_trade(requested_goods, offered_goods):
+        if buyer_points == seller_points:
+            self.execute_trade(requested_goods, seller_map, offered_goods, buyer_map, (buyer_inventory_ids + seller_inventory_ids))
             return constants.UserConstant.UserTradingConstants.SUCCESSFULLY_TRADED
 
         else:
@@ -98,50 +106,52 @@ class UserController:
 
 
     @staticmethod
-    def verify(user_id, goods):
+    def calculate_points(user_id, goods):
 
-        user_inventory_qset = UserInventory.objects.filter(user_id = user_id)
-        inventory_qset = InventoryDetails.objects.all()
+        query = f"""
+                select ui.id as id, ui.qty as qty, ind.name as name, ind.points as points
+                from user_inventory as ui JOIN inventory_details as ind
+                ON ui.inventory_id = ind.id where ui.user_id={user_id}
+                """
+        
+        results = UserInventory.objects.raw(query)
+        inventory_details = {}
+        total_points = 0
+        err = None
+        inventory_user_map = {}
+        user_inventory_ids = []
+
+        for obj in results:
+            print(obj.name, obj.points, obj.qty)
+
+            inventory_details[obj.name] = [obj.qty, obj.points]
+            inventory_user_map[obj.name] = obj.id
+            user_inventory_ids.append(obj.id)
 
         for key, value in goods.items():
-
-            if key == constants.InventoryConstant.WATER:
-                inventory_id = inventory_qset.get(name = key)
-                return constants.UserConstant.UserTradingConstants.UNAVAILABLE_ERROR
-
-            elif key == constants.InventoryConstant.FOOD and value != user_inventory_obj.food:
-                return constants.UserConstant.UserTradingConstants.UNAVAILABLE_ERROR
-
-            elif key == constants.InventoryConstant.MEDICATION and value != user_inventory_obj.medication:
-                return constants.UserConstant.UserTradingConstants.UNAVAILABLE_ERROR
-
-            elif key == constants.InventoryConstant.AMMUNITIONN and value != user_inventory_obj.ammunition:
-                return constants.UserConstant.UserTradingConstants.UNAVAILABLE_ERROR
-            
+            inventory = inventory_details.get(key)
+            print(key, inventory)
+            if inventory and inventory[0]>=value:
+                total_points += (value*inventory[1])
             else:
-                return None
+                err = constants.UserConstant.UserTradingConstants.UNAVAILABLE_ERROR
+                break
+        
+        return total_points, inventory_user_map, user_inventory_ids, err
 
+    @staticmethod 
+    def execute_trade(requested_goods, seller_map, offered_goods, buyer_map, user_inventory_list):
 
-        @staticmethod
-        def execute_trade(requested_goods, offered_goods):
+        user_inventory_qset = UserInventory.objects.filter(id__in = user_inventory_list)
+        for key, value in requested_goods.items():
+            user_inventory = user_inventory_qset.get(id=seller_map.get(key))
+            user_inventory.qty = user_inventory.qty - value
+            user_inventory.save(update_fields=['qty'])
 
-            buy_value = 0
-            sell_value = 0
-
-            inventory_qset = InventoryDetails.objects.all()
-
-            for obj in inventory_qset:
-                if requested_goods.get(obj.name):
-                    buy_value += obj.points
-
-                if offered_goods.get(obj.name):
-                    sell_value += obj.points
-
-            if sell_value == buy_value:
-
-                return True
-
-            return False
+        for key, value in offered_goods.items():
+            user_inventory = user_inventory_qset.get(id=buyer_map.get(key))
+            user_inventory.qty = user_inventory.qty - value
+            user_inventory.save(update_fields=['qty'])
 
 
     def generate_report(self):

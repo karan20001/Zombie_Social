@@ -21,3 +21,10 @@ class UserSerializer(serializers.ModelSerializer):
 class UserLocationSerializer(serializers.Serializer):
     lat = serializers.DecimalField(max_digits=15, decimal_places=10)
     long = serializers.DecimalField(max_digits=15, decimal_places=10)
+
+
+class UserTradingSerializer(serializers.Serializer):
+    food = serializers.IntegerField(required = False)
+    water = serializers.IntegerField(required = False)
+    medication = serializers.IntegerField(required = False)
+    ammunition = serializers.IntegerField(required = False)

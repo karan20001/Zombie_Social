@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 
 from user.controller import UserController
 
-from .serializers import UserSerializer, UserLocationSerializer
+from .serializers import UserSerializer, UserLocationSerializer, UserTradingSerializer
 from rest_framework.response import Response
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import status
@@ -82,25 +82,44 @@ class UserLocationView(APIView):
 
 class UserReportingView(APIView):
     
-    # @authentication
+    @authentication
     def patch (self,request, user_id):
         headers = request.headers
         token = headers.get("Authorization")
         payload = jwt.decode(token, "secret", algorithms=['HS256'])
-        res = UserController().mark_user(user_id, payload['id'])
+        try:
+            res = UserController().mark_user(user_id, payload['id'])
+        except Exception as e:
+            print(e)
         return Response({"status" : 1,"message" : "Success", "data" : res}, status = HTTP_200_OK)
 
 
 class UserTradingingView(APIView):
 
-    # @authentication
+    @authentication
     def patch(self, request, user_id):
-        headers = request.headers
-        token = headers.get("Authorization")
-        payload = jwt.decode(token, "secret", algorithms=['HS256'])
-        res = UserController().trade_inventory(user_id, payload['id'])
-        return Response({"status" : 1,"message" : "Success", "data" : res}, status = HTTP_200_OK)
+        try:
+            headers = request.headers
+            token = headers.get("Authorization")
+            payload = jwt.decode(token, "secret", algorithms=['HS256'])
+            try:
 
+                requested_goods = UserTradingSerializer(data = request.data.get("requested_goods"))
+                requested_goods.is_valid(raise_exception=True)
+                requested_goods = requested_goods.validated_data
+            except Exception as e:
+                print(e)
+
+            offered_goods = UserTradingSerializer(data = request.data.get("offered_goods"))
+            offered_goods.is_valid(raise_exception=True)
+            offered_goods = offered_goods.validated_data
+            try:
+                res = UserController().trade_inventory(user_id, payload['id'], requested_goods, offered_goods)
+            except Exception as e:
+                print(e)
+            return Response({"status" : 1,"message" : "Success", "data" : res}, status = HTTP_200_OK)
+        except Exception as e:
+            print(e)
 
 class LoginView(APIView):
     def post(self, request):
@@ -171,7 +190,7 @@ class LogoutView(APIView):
 
 
 class ReportsView(APIView):
-
+    @authentication
     def get(self,request):
         
         res = UserController().generate_report()

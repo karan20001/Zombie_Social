@@ -18,16 +18,17 @@ class UserConstant:
 
         SUCCESSFULLY_TRADED = "The trade was successfully executed"
         UNFAIR_TRADE = "The trade is not fair"
-        UNAVAILABLE_ERROR = "inventory is unavailable"
+        UNAVAILABLE_ERROR = " inventory is unavailable"
         OFFERED = "Offered"
         REQUESTED = "Requested"
+        INFECTED = "Trade not possible due to contamination"
 
 
 
 class InventoryConstant:
     INVENTORY_LIST = [
         "water",
-        "foor",
+        "food",
         "medication",
         "ammunition"
     ]
